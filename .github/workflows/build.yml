@@ -28,40 +28,29 @@ jobs:
           cp -R /tmp/sdks-master/* "$THEOS/sdks/"
           ls "$THEOS/sdks" | head -5
 
-      - name: Show toolchain
-        run: |
-          xcodebuild -version || true
-          clang --version || true
-          echo "THEOS=$THEOS"
-
-      - name: Build
+      - name: Build (arm64e only)
         run: |
           make clean || true
-          make 2>&1 | tail -60
+          make 2>&1 | tail -80
 
-      - name: Locate and merge dylib
+      - name: Locate dylib
         run: |
           echo "=== all dylib found ==="
           find . -name "*.dylib" -type f -not -path "*dSYM*" -exec ls -l {} \;
+          echo "=== .theos/obj tree ==="
+          find .theos -type f 2>/dev/null | head -30
           mkdir -p out
-          A64=".theos/obj/arm64/igtap2.dylib"
           A64E=".theos/obj/arm64e/igtap2.dylib"
-          if [ -f "$A64" ] && [ -f "$A64E" ]; then
-            echo "merging arm64 + arm64e"
-            lipo -create "$A64" "$A64E" -output out/igtap2.dylib
-          elif [ -f "$A64E" ]; then
-            echo "using arm64e only"
+          if [ -f "$A64E" ]; then
             cp "$A64E" out/igtap2.dylib
-          elif [ -f "$A64" ]; then
-            echo "using arm64 only"
-            cp "$A64" out/igtap2.dylib
+            echo "used arm64e build"
           else
-            echo "!! no dylib in .theos/obj"
+            echo "!! arm64e build missing, trying any:"
             find . -name "igtap2.dylib" -not -path "*dSYM*" -exec cp {} out/ \;
           fi
           echo "=== result ==="
+          ls -l out/
           lipo -info out/igtap2.dylib || true
-          file out/igtap2.dylib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
