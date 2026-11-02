@@ -39,15 +39,29 @@ jobs:
           make clean || true
           make 2>&1 | tail -60
 
-      - name: Locate dylib
+      - name: Locate and merge dylib
         run: |
           echo "=== all dylib found ==="
-          find . -name "*.dylib" -type f -exec ls -l {} \;
+          find . -name "*.dylib" -type f -not -path "*dSYM*" -exec ls -l {} \;
           mkdir -p out
-          find . -name "igtap2.dylib" -type f -not -path "*dSYM*" -exec cp {} out/ \;
-          echo "=== picked ==="
-          ls -l out/
-          file out/*.dylib
+          A64=".theos/obj/arm64/igtap2.dylib"
+          A64E=".theos/obj/arm64e/igtap2.dylib"
+          if [ -f "$A64" ] && [ -f "$A64E" ]; then
+            echo "merging arm64 + arm64e"
+            lipo -create "$A64" "$A64E" -output out/igtap2.dylib
+          elif [ -f "$A64E" ]; then
+            echo "using arm64e only"
+            cp "$A64E" out/igtap2.dylib
+          elif [ -f "$A64" ]; then
+            echo "using arm64 only"
+            cp "$A64" out/igtap2.dylib
+          else
+            echo "!! no dylib in .theos/obj"
+            find . -name "igtap2.dylib" -not -path "*dSYM*" -exec cp {} out/ \;
+          fi
+          echo "=== result ==="
+          lipo -info out/igtap2.dylib || true
+          file out/igtap2.dylib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
