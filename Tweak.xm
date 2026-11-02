@@ -1,13 +1,18 @@
 #import <Foundation/Foundation.h>
 
-#define COOKIE_FILE @"/var/mobile/Media/ig/app_cookie.txt"
-#define LOG_FILE    @"/var/mobile/Media/ig/igtap.log"
+// TrollFools 注入版：写 App 沙盒内的 tmp 目录
+static NSString *igtap_file(NSString *name) {
+    NSString *dir = NSTemporaryDirectory();
+    if (!dir || dir.length == 0) dir = @"/tmp";
+    return [dir stringByAppendingPathComponent:name];
+}
 
-static void ig_log(NSString *s) {
+static void igtap_log(NSString *s) {
     NSString *line = [NSString stringWithFormat:@"[%@] %@\n", [NSDate date], s];
-    NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:LOG_FILE];
+    NSString *p = igtap_file(@"igtap2.log");
+    NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:p];
     if (!fh) {
-        [line writeToFile:LOG_FILE atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [line writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
         return;
     }
     @try {
@@ -18,7 +23,7 @@ static void ig_log(NSString *s) {
     }
 }
 
-static void ig_grab(NSURLRequest *req) {
+static void igtap_grab(NSURLRequest *req) {
     static BOOL done = NO;
     if (done || !req) return;
     @try {
@@ -28,11 +33,12 @@ static void ig_grab(NSURLRequest *req) {
         if ([ck rangeOfString:@"ds_user_id="].location == NSNotFound) return;
 
         done = YES;
-        [ck writeToFile:COOKIE_FILE atomically:YES
-               encoding:NSUTF8StringEncoding error:nil];
-        ig_log([NSString stringWithFormat:@"OK captured len=%lu", (unsigned long)ck.length]);
+        NSString *p = igtap_file(@"igtap2_cookie.txt");
+        [ck writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        igtap_log([NSString stringWithFormat:@"OK captured len=%lu -> %@",
+                   (unsigned long)ck.length, p]);
     } @catch (NSException *e) {
-        ig_log([NSString stringWithFormat:@"grab err: %@", e]);
+        igtap_log([NSString stringWithFormat:@"grab err: %@", e]);
     }
 }
 
@@ -40,7 +46,7 @@ static void ig_grab(NSURLRequest *req) {
 
 - (NSURLSessionDataTask *)dataTaskWithRequest:(NSURLRequest *)request
                             completionHandler:(void (^)(NSData *, NSURLResponse *, NSError *))handler {
-    ig_grab(request);
+    igtap_grab(request);
     return %orig;
 }
 
@@ -49,12 +55,13 @@ static void ig_grab(NSURLRequest *req) {
 %hook NSURLSession
 
 - (NSURLSessionDataTask *)dataTaskWithRequest:(NSURLRequest *)request {
-    ig_grab(request);
+    igtap_grab(request);
     return %orig;
 }
 
 %end
 
 %ctor {
-    ig_log(@"igtap2 loaded");
+    igtap_log([NSString stringWithFormat:@"igtap2 loaded (sandbox), tmp=%@",
+               NSTemporaryDirectory()]);
 }
