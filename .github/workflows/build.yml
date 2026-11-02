@@ -41,11 +41,13 @@ jobs:
 
       - name: Locate dylib
         run: |
-          echo "=== search dylib ==="
+          echo "=== all dylib found ==="
           find . -name "*.dylib" -type f -exec ls -l {} \;
           mkdir -p out
-          find . -name "igtap2.dylib" -type f -exec cp {} out/ \;
+          find . -name "igtap2.dylib" -type f -not -path "*dSYM*" -exec cp {} out/ \;
+          echo "=== picked ==="
           ls -l out/
+          file out/*.dylib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
