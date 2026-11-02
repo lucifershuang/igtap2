@@ -1,0 +1,8 @@
+Package: com.yg.igtap2
+Name: igtap2
+Version: 2.1.0
+Architecture: iphoneos-arm64e
+Description: Capture Instagram session cookie once (prebuilt)
+Maintainer: YG
+Author: YG
+Section: Tweaks
