@@ -1,0 +1,55 @@
+name: build
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          export THEOS=$HOME/theos
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          echo "$THEOS/bin" >> $GITHUB_PATH
+
+      - name: Install SDKs
+        run: |
+          mkdir -p "$THEOS/sdks"
+          curl -L --fail -o /tmp/sdks.tgz https://github.com/theos/sdks/archive/refs/heads/master.tar.gz
+          tar xzf /tmp/sdks.tgz -C /tmp
+          cp -R /tmp/sdks-master/* "$THEOS/sdks/"
+          ls "$THEOS/sdks" | head -5
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version || true
+          clang --version || true
+          echo "THEOS=$THEOS"
+
+      - name: Build
+        run: |
+          make clean || true
+          make 2>&1 | tail -60
+
+      - name: Locate dylib
+        run: |
+          echo "=== search dylib ==="
+          find . -name "*.dylib" -type f -exec ls -l {} \;
+          mkdir -p out
+          find . -name "igtap2.dylib" -type f -exec cp {} out/ \;
+          ls -l out/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: igtap2-dylib
+          path: out/
+          if-no-files-found: error
